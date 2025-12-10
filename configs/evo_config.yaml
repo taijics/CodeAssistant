@@ -1,0 +1,25 @@
+include_exts:
+  - .py
+  - .java
+  - .kt
+  - .go
+  - .js
+  - .ts
+  - .tsx
+  - .jsx
+  - .vue
+  - .sql
+  - .md
+  - .json
+exclude_globs:
+  - "node_modules/**"
+  - ".git/**"
+  - ".venv/**"
+  - "**/*.min.js"
+  - "**/dist/**"
+  - "**/.DS_Store"
+max_context_tokens: 8000
+token_budget: 16000
+compress_token_limit_per_file: 3000
+num_workers: 10
+vectorstore_path: ".evo_agent/chroma"

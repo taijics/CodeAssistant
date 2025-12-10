@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>新建项目</h2>
+  <form method="post" action="/projects">
+    <div class="row">
+      <div class="col">
+        <label>项目名称</label>
+        <input type="text" name="name" placeholder="My Project" required />
+      </div>
+      <div class="col">
+        <label>项目根目录（绝对路径）</label>
+        <input type="text" name="root" placeholder="/abs/path/to/project" required />
+      </div>
+    </div>
+    <p><button type="submit">添加</button></p>
+  </form>
+</div>
+
+<div class="card">
+  <h2>项目列表</h2>
+  {% if projects %}
+    <ul>
+      {% for p in projects %}
+        <li>
+          <a href="/projects/{{ p.id }}"><strong>{{ p.name }}</strong></a>
+          <code>{{ p.root }}</code>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>暂无项目，先上方添加一个。</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>{{ project.name }}</h2>
+  <p><strong>目录：</strong><code>{{ project.root }}</code></p>
+</div>
+
+<div class="card">
+  <h3>配置（每项目）</h3>
+  <form method="post" action="/projects/{{ project.id }}/config">
+    <div class="row">
+      <div class="col">
+        <label>max_context_tokens</label>
+        <input type="number" name="max_context_tokens" value="{{ project.config.max_context_tokens or 8000 }}" />
+      </div>
+      <div class="col">
+        <label>token_budget</label>
+        <input type="number" name="token_budget" value="{{ project.config.token_budget or 16000 }}" />
+      </div>
+      <div class="col">
+        <label>num_workers（线程数）</label>
+        <input type="number" name="num_workers" value="{{ project.config.num_workers or 10 }}" />
+      </div>
+    </div>
+    <p><button type="submit">保存配置</button></p>
+  </form>
+</div>
+
+<div class="card">
+  <h3>生成 Spec（审核文档）</h3>
+  <form method="post" action="/projects/{{ project.id }}/plan">
+    <label>任务需求</label>
+    <textarea name="task" rows="4" placeholder="例如：为登录添加刷新 token，后端 Flask，前端 React，DB MySQL" required></textarea>
+    <p><button type="submit">生成</button></p>
+  </form>
+  {% if has_spec %}
+    <p>最新 Spec：<a class="button" href="/projects/{{ project.id }}/artifacts/spec.md" target="_blank">打开</a></p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3>提交 LLM</h3>
+  <form method="post" action="/projects/{{ project.id }}/submit">
+    <div class="row">
+      <div class="col">
+        <label>Provider</label>
+        <select name="provider" required>
+          <option value="openai">OpenAI</option>
+          <option value="anthropic">Anthropic</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>Model</label>
+        <input type="text" name="model" placeholder="gpt-4o" required />
+      </div>
+    </div>
+    <p><button type="submit">提交并保存响应</button></p>
+  </form>
+  {% if has_resp %}
+    <p>最新响应：<a class="button" href="/projects/{{ project.id }}/artifacts/llm_response.txt" target="_blank">打开</a></p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3>应用变更（自动写回）</h3>
+  <form method="post" action="/projects/{{ project.id }}/apply">
+    <label><input type="checkbox" name="git_commit" value="1" /> 写回后自动 git commit</label>
+    <p><button type="submit">应用</button></p>
+  </form>
+</div>
+
+<div class="card">
+  <h3>提示</h3>
+  <ul>
+    <li>Spec 与响应保存在 <code>{{ project.root }}/.evo_agent/artifacts/</code></li>
+    <li>错题本（记忆）在 <code>{{ project.root }}/.evo_agent/mistakes.json</code></li>
+    <li>如需向量检索增强，请安装 <code>pip install -r requirements-vector.txt</code> 并接入</li>
+  </ul>
+</div>
+{% endblock %}
