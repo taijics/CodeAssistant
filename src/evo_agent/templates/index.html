@@ -1,35 +1,49 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="card">
-  <h2>新建项目</h2>
-  <form method="post" action="/projects">
-    <div class="row">
-      <div class="col">
-        <label>项目名称</label>
-        <input type="text" name="name" placeholder="My Project" required />
-      </div>
-      <div class="col">
-        <label>项目根目录（绝对路径）</label>
-        <input type="text" name="root" placeholder="/abs/path/to/project" required />
-      </div>
-    </div>
-    <p><button type="submit">添加</button></p>
-  </form>
-</div>
+<div class="panel grid">
+  <section class="card">
+    <h2>新增项目</h2>
+    <form method="post" action="/projects" class="form">
+      <label>项目名称</label>
+      <input type="text" name="name" placeholder="My Project" required />
 
-<div class="card">
-  <h2>项目列表</h2>
-  {% if projects %}
-    <ul>
-      {% for p in projects %}
-        <li>
-          <a href="/projects/{{ p.id }}"><strong>{{ p.name }}</strong></a>
-          <code>{{ p.root }}</code>
-        </li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p>暂无项目，先上方添加一个。</p>
-  {% endif %}
+      <label>项目根目录（绝对路径）</label>
+      <input type="text" name="root" placeholder="/abs/path/to/project" required />
+
+      <label>功能简介（可选）</label>
+      <input type="text" name="description" placeholder="例如：电商后台系统" />
+
+      <p class="form-actions"><button type="submit" class="btn-primary">添加项目</button></p>
+    </form>
+  </section>
+
+  <section class="card flex-1">
+    <h2>项目列表</h2>
+    {% if projects %}
+      <div class="project-list">
+        {% for p in projects %}
+        <div class="project-item">
+          <div class="pi-left">
+            <h3><a href="/projects/{{ p.id }}">{{ p.name }}</a></h3>
+            <p class="muted">{{ p.root }}</p>
+            <p class="muted small">{{ p.config | default({}) | length }} config fields</p>
+          </div>
+          <div class="pi-right">
+            <div class="meta">
+              <div><strong>文件数</strong><div class="meta-val">{{ p.project_file_count or '—' }}</div></div>
+              <div><strong>符号数</strong><div class="meta-val">{{ p.symbol_count or '—' }}</div></div>
+              <div><strong>最近 Token</strong><div class="meta-val">{{ p.last_plan_tokens or '—' }}</div></div>
+            </div>
+            <div class="actions">
+              <a class="btn" href="/projects/{{ p.id }}">管理</a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p>暂无项目，先上方添加一个。</p>
+    {% endif %}
+  </section>
 </div>
 {% endblock %}
