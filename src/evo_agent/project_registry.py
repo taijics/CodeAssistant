@@ -1,6 +1,7 @@
 import os
 import json
 import uuid
+from datetime import datetime
 from typing import Dict, List, Optional
 
 REG_PATH = os.path.join(os.path.expanduser("~"), ".evo_agent")
@@ -23,13 +24,21 @@ def get_project(pid: str) -> Optional[Dict]:
             return p
     return None
 
-def add_project(name: str, root: str, config: Optional[Dict] = None) -> Dict:
+def add_project(name: str, root: str, description: str = "", config: Optional[Dict] = None) -> Dict:
     _ensure_store()
     proj = {
         "id": str(uuid.uuid4()),
         "name": name,
         "root": os.path.abspath(root),
-        "config": config or {}
+        "description": description,
+        "created_at": datetime.utcnow().isoformat() + "Z",
+        # 一些可编辑的架构说明等放在 config 里
+        "config": config or {
+            "frontend": "",
+            "server": "",
+            "admin": "",
+            "mod_count": 0,
+        },
     }
     projs = list_projects()
     projs.append(proj)
@@ -44,7 +53,14 @@ def update_project(pid: str, patch: Dict) -> Optional[Dict]:
     target = None
     for p in projs:
         if p["id"] == pid:
-            p.update(patch)
+            # 浅更新：支持更新 description / config 等
+            for k, v in patch.items():
+                if k == "config" and isinstance(v, dict):
+                    cfg = p.get("config") or {}
+                    cfg.update(v)
+                    p["config"] = cfg
+                else:
+                    p[k] = v
             target = p
         out.append(p)
     with open(REG_FILE, "w", encoding="utf-8") as f:

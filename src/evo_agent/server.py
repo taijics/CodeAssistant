@@ -1,8 +1,9 @@
 from pathlib import Path
-from typing import Optional, Dict, Any, List
-import os
+from typing import Optional
 import json
-from fastapi import FastAPI, Request, Form, HTTPException
+from datetime import datetime
+
+from fastapi import FastAPI, Form, HTTPException
 from fastapi.responses import RedirectResponse, FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -17,18 +18,14 @@ from .assembler import assemble_spec, DEFAULT_SYSTEM
 from .connectors import call_llm
 from .applier import apply_changes
 
-# Templates / static
-TEMPLATES_DIR = Path(__file__).parent / "templates"
-STATIC_DIR = Path(__file__).parent / "static"
+BASE_DIR = Path(__file__).parent
+TEMPLATES_DIR = BASE_DIR / "templates"
+STATIC_DIR = BASE_DIR / "static"
+
 env = Environment(
     loader=FileSystemLoader(str(TEMPLATES_DIR)),
     autoescape=select_autoescape(["html"])
 )
-
-# Create FastAPI app and mount static assets
-app = FastAPI(title="Evo Agent UI")
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-
 
 DEFAULT_CFG = {
     "include_exts": [".py",".java",".kt",".go",".js",".ts",".tsx",".jsx",".vue",".sql",".md",".json"],
@@ -39,7 +36,9 @@ DEFAULT_CFG = {
     "num_workers": 10
 }
 
-# Helper render
+app = FastAPI(title="Evo Agent UI")
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
 def render(name: str, **ctx):
     tpl = env.get_template(name)
     return HTMLResponse(tpl.render(**ctx))
@@ -47,13 +46,11 @@ def render(name: str, **ctx):
 @app.get("/")
 def index():
     projs = list_projects()
-    # Enrich with some computed metadata if available
     enriched = []
     for p in projs:
-        root = p.get("root")
         meta = p.copy()
+        root = p.get("root")
         try:
-            # basic stats: file count if previously scanned (artifact), else unknown
             store = Path(root) / ".evo_agent"
             stats_file = store / "project_meta.json"
             if stats_file.exists():
@@ -65,8 +62,17 @@ def index():
     return render("index.html", projects=enriched)
 
 @app.post("/projects")
-def create_project(name: str = Form(...), root: str = Form(...), description: str = Form("")):
-    add_project(name=name, root=root, config={})
+def create_project(
+    name: str = Form(...),
+    root: str = Form(...),
+    description: str = Form("")
+):
+    add_project(name=name, root=root, description=description, config={})
+    return RedirectResponse(url="/", status_code=303)
+
+@app.post("/projects/{pid}/delete")
+def delete_project(pid: str):
+    remove_project(pid)
     return RedirectResponse(url="/", status_code=303)
 
 @app.get("/projects/{pid}")
@@ -80,7 +86,6 @@ def project_detail(pid: str):
     spec_path = artifacts / "spec.md"
     resp_path = artifacts / "llm_response.txt"
 
-    # try load project meta (file counters)
     meta = {}
     try:
         stats_file = Path(root) / ".evo_agent" / "project_meta.json"
@@ -89,17 +94,37 @@ def project_detail(pid: str):
     except Exception:
         meta = {}
 
-    return render("project_detail.html",
-                  project=proj,
-                  has_spec=spec_path.exists(),
-                  has_resp=resp_path.exists(),
-                  meta=meta)
+    return render(
+        "project_detail.html",
+        project=proj,
+        has_spec=spec_path.exists(),
+        has_resp=resp_path.exists(),
+        meta=meta,
+    )
+
+@app.post("/projects/{pid}/meta")
+def update_meta(
+    pid: str,
+    frontend: str = Form(""),
+    server: str = Form(""),
+    admin: str = Form(""),
+    description: str = Form("")
+):
+    proj = get_project(pid)
+    if not proj:
+        return RedirectResponse(url="/", status_code=302)
+    cfg = proj.get("config") or {}
+    cfg.update({"frontend": frontend, "server": server, "admin": admin})
+    update_project(pid, {"config": cfg, "description": description})
+    return RedirectResponse(url=f"/projects/{pid}", status_code=303)
 
 @app.post("/projects/{pid}/config")
-def update_config(pid: str,
-                  max_context_tokens: int = Form(DEFAULT_CFG["max_context_tokens"]),
-                  token_budget: int = Form(DEFAULT_CFG["token_budget"]),
-                  num_workers: int = Form(DEFAULT_CFG["num_workers"])):
+def update_config(
+    pid: str,
+    max_context_tokens: int = Form(DEFAULT_CFG["max_context_tokens"]),
+    token_budget: int = Form(DEFAULT_CFG["token_budget"]),
+    num_workers: int = Form(DEFAULT_CFG["num_workers"])
+):
     proj = get_project(pid)
     if not proj:
         return RedirectResponse(url="/", status_code=302)
@@ -116,11 +141,10 @@ def update_config(pid: str,
 def plan(pid: str, task: str = Form(...)):
     proj = get_project(pid)
     if not proj:
-        raise HTTPException(status_code=404, detail="project not found")
+        return RedirectResponse(url="/", status_code=302)
     root = proj["root"]
     cfg = {**DEFAULT_CFG, **(proj.get("config") or {})}
 
-    # perform scan (this may be heavy) - reuse existing scan_project
     docs = scan_project(root, tuple(cfg["include_exts"]), cfg["exclude_globs"], num_workers=cfg["num_workers"])
     symbols = index_symbols(docs)
     tree_text = build_tree(docs)
@@ -128,8 +152,7 @@ def plan(pid: str, task: str = Form(...)):
     symbol_summary = "\n".join(symbol_lines)
 
     selected = select_files(docs, task, max_context_tokens=cfg["max_context_tokens"])
-    compressed = compress_files(selected, per_file_limit_per_file=cfg["compress_token_limit_per_file"])
-
+    compressed = compress_files(selected, per_file_limit_tokens=cfg["compress_token_limit_per_file"])
     spec, tokens = assemble_spec(root, task, tree_text, symbol_summary, compressed,
                                  system_prompt=DEFAULT_SYSTEM, token_budget=cfg["token_budget"])
 
@@ -137,14 +160,17 @@ def plan(pid: str, task: str = Form(...)):
     artifacts.mkdir(parents=True, exist_ok=True)
     (artifacts / "spec.md").write_text(spec, encoding="utf-8")
 
-    # save some metadata (file count, symbol counts) for display in UI
+    # 记录一些统计信息，供 UI 显示
     try:
         meta = {
             "project_file_count": len(docs),
             "symbol_count": len(symbols),
-            "last_plan_tokens": tokens
+            "last_plan_tokens": tokens,
         }
         (Path(root) / ".evo_agent" / "project_meta.json").write_text(json.dumps(meta), encoding="utf-8")
+        cfg = proj.get("config") or {}
+        cfg["mod_count"] = int(cfg.get("mod_count", 0)) + 1
+        update_project(pid, {"config": cfg})
     except Exception:
         pass
 
@@ -161,9 +187,7 @@ def get_artifact(pid: str, fname: str):
     return FileResponse(str(f))
 
 @app.post("/projects/{pid}/submit")
-def submit(pid: str,
-           provider: str = Form(...),
-           model: str = Form(...)):
+def submit(pid: str, provider: str = Form(...), model: str = Form(...)):
     proj = get_project(pid)
     if not proj:
         return RedirectResponse(url="/", status_code=302)
@@ -188,14 +212,15 @@ def apply(pid: str, git_commit: Optional[str] = Form(None)):
         return RedirectResponse(url=f"/projects/{pid}", status_code=302)
     text = resp.read_text(encoding="utf-8")
     apply_changes(text, project_root=proj["root"], git_commit=bool(git_commit))
+
+    cfg = proj.get("config") or {}
+    cfg["mod_count"] = int(cfg.get("mod_count", 0)) + 1
+    update_project(pid, {"config": cfg})
     return RedirectResponse(url=f"/projects/{pid}", status_code=303)
 
+# 文件树 / 搜索 / 读取（与之前版本一致，可后续完善搜索逻辑）
 @app.get("/projects/{pid}/files")
 def project_files(pid: str):
-    """
-    Return a JSON list of project files as a simple tree structure.
-    This endpoint is intentionally lightweight: it enumerates file paths only (no file contents).
-    """
     proj = get_project(pid)
     if not proj:
         raise HTTPException(status_code=404, detail="project not found")
@@ -219,16 +244,10 @@ def project_files(pid: str):
 
 @app.post("/projects/{pid}/search")
 def project_search(pid: str, query: str = Form(...)):
-    """
-    Placeholder search endpoint.
-    For now it returns an empty list; frontend is built to consume a list of entities
-    with fields: {'type','name','path','snippet'}.
-    Functional implementation will be added later (embeddings/regex/indexer).
-    """
     proj = get_project(pid)
     if not proj:
         raise HTTPException(status_code=404, detail="project not found")
-    # TODO: implement real search logic later
+    # TODO: 这里后续接入真正的检索逻辑，目前先返回空
     return JSONResponse([])
 
 @app.post("/projects/{pid}/files/read")

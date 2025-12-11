@@ -2,31 +2,35 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
-  <title>Evo Agent UI</title>
+  <title>Evo Agent · 代码助手中控台</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
   <header class="site-header">
     <div class="container header-inner">
       <div class="brand">
-        <h1>Evo Agent</h1>
-        <p class="subtitle">进化式 AI 代码助手 — 项目管理与 Prompt 中间件</p>
+        <span class="brand-logo">EA</span>
+        <div>
+          <h1>Evo Agent</h1>
+          <p class="subtitle">进化式 AI 代码助手 · 项目与 Prompt 管理中台</p>
+        </div>
       </div>
       <nav class="top-nav">
         <a href="/">项目</a>
-        <a href="#" id="help-link">使用说明</a>
+        <a href="#" class="muted">团队</a>
+        <a href="#" class="muted">设置</a>
       </nav>
     </div>
   </header>
 
-  <main class="container">
+  <main class="container main-container">
     {% block content %}{% endblock %}
   </main>
 
   <footer class="site-footer">
     <div class="container">
-      <small>© Evo Agent · 2025 · 本界面为轻量演示，可按需扩展</small>
+      <span>© {{ 2025 }} Evo Agent · 适用于团队协作的代码助手中间件</span>
     </div>
   </footer>
 

@@ -1,88 +1,164 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="panel two-col">
-  <aside class="card sidebar">
-    <h3>{{ project.name }}</h3>
-    <p class="muted">{{ project.root }}</p>
-    <dl class="info-list">
-      <dt>简介</dt><dd>{{ project.config.description or '—' }}</dd>
-      <dt>添加时间</dt><dd>{{ project.get('created_at','—') }}</dd>
-      <dt>文件总数</dt><dd>{{ meta.project_file_count or '—' }}</dd>
-      <dt>符号总数</dt><dd>{{ meta.symbol_count or '—' }}</dd>
-      <dt>修改次数（placeholder）</dt><dd>{{ project.config.get('mod_count','—') }}</dd>
-      <dt>前端架构</dt><dd>{{ project.config.get('frontend','—') }}</dd>
-      <dt>server 架构</dt><dd>{{ project.config.get('server','—') }}</dd>
-      <dt>后台管理端架构</dt><dd>{{ project.config.get('admin','—') }}</dd>
-    </dl>
+<div class="layout-detail">
+  <!-- 左列：项目信息与配置 -->
+  <aside class="card card-elevated detail-sidebar">
+    <div class="card-header">
+      <h2>{{ project.name }}</h2>
+      <p class="muted small mono">{{ project.root }}</p>
+    </div>
 
-    <div class="box">
-      <h4>快速操作</h4>
-      <form method="post" action="/projects/{{ project.id }}/plan" id="plan-form">
+    <section class="section">
+      <h3 class="section-title">项目信息</h3>
+      <dl class="info-list">
+        <dt>功能简介</dt><dd>{{ project.description or '—' }}</dd>
+        <dt>创建时间</dt><dd>{{ project.created_at or '—' }}</dd>
+        <dt>修改次数</dt><dd>{{ project.config.mod_count or '0' }}</dd>
+        <dt>文件总数</dt><dd>{{ meta.project_file_count or '—' }}</dd>
+        <dt>符号总数</dt><dd>{{ meta.symbol_count or '—' }}</dd>
+        <dt>最近 Spec Token</dt><dd>{{ meta.last_plan_tokens or '—' }}</dd>
+      </dl>
+    </section>
+
+    <section class="section">
+      <h3 class="section-title">架构说明</h3>
+      <form method="post" action="/projects/{{ project.id }}/meta" class="form vertical">
+        <label>功能简介</label>
+        <textarea name="description" rows="2" placeholder="整体功能与业务说明">{{ project.description or '' }}</textarea>
+
+        <label>用户前端架构</label>
+        <textarea name="frontend" rows="2" placeholder="例如：React + Vite + Tailwind">{{ project.config.frontend or '' }}</textarea>
+
+        <label>Server 端架构</label>
+        <textarea name="server" rows="2" placeholder="例如：FastAPI + SQLAlchemy + Redis">{{ project.config.server or '' }}</textarea>
+
+        <label>后台管理端架构</label>
+        <textarea name="admin" rows="2" placeholder="例如：Ant Design Pro + Umi">{{ project.config.admin or '' }}</textarea>
+
+        <p class="form-actions">
+          <button type="submit" class="btn-primary">保存说明</button>
+        </p>
+      </form>
+    </section>
+
+    <section class="section">
+      <h3 class="section-title">参数配置</h3>
+      <form method="post" action="/projects/{{ project.id }}/config" class="form vertical">
+        <div class="row">
+          <div class="col">
+            <label>max_context_tokens</label>
+            <input type="number" name="max_context_tokens" value="{{ project.config.max_context_tokens or 8000 }}" />
+          </div>
+          <div class="col">
+            <label>token_budget</label>
+            <input type="number" name="token_budget" value="{{ project.config.token_budget or 16000 }}" />
+          </div>
+          <div class="col">
+            <label>num_workers</label>
+            <input type="number" name="num_workers" value="{{ project.config.num_workers or 10 }}" />
+          </div>
+        </div>
+        <p class="form-actions">
+          <button type="submit" class="btn-ghost">保存参数</button>
+        </p>
+      </form>
+    </section>
+
+    <section class="section">
+      <h3 class="section-title">LLM 操作</h3>
+      <form method="post" action="/projects/{{ project.id }}/plan" class="form vertical">
         <label>任务需求（简述）</label>
-        <textarea name="task" rows="3" placeholder="例如：为登录添加刷新 token" required></textarea>
+        <textarea name="task" rows="3" placeholder="例如：为登录增加刷新 token，前端接入 /auth/refresh 接口" required></textarea>
         <p class="form-actions">
           <button class="btn-primary" type="submit">生成 Spec</button>
         </p>
       </form>
 
-      <div style="margin-top:1rem">
-        <button class="btn" id="btn-open-files">查看文件树</button>
-        <button class="btn" id="btn-search" data-pid="{{ project.id }}">搜索项目</button>
+      <div class="llm-actions">
+        <form method="post" action="/projects/{{ project.id }}/submit">
+          <div class="row">
+            <div class="col">
+              <label>Provider</label>
+              <select name="provider" required>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+              </select>
+            </div>
+            <div class="col">
+              <label>Model</label>
+              <input type="text" name="model" placeholder="gpt-4o" required />
+            </div>
+          </div>
+          <p class="form-actions">
+            <button class="btn-ghost" type="submit">提交 Spec 给 LLM</button>
+          </p>
+        </form>
+
+        <form method="post" action="/projects/{{ project.id }}/apply">
+          <label><input type="checkbox" name="git_commit" value="1" /> 写回后自动 git commit</label>
+          <p class="form-actions">
+            <button class="btn-ghost" type="submit">应用 LLM 变更</button>
+          </p>
+        </form>
+
+        <div class="links">
+          <a class="link" href="/projects/{{ project.id }}/artifacts/spec.md" target="_blank">打开 Spec</a>
+          <a class="link" href="/projects/{{ project.id }}/artifacts/llm_response.txt" target="_blank">查看响应</a>
+        </div>
       </div>
-    </div>
+    </section>
   </aside>
 
-  <section class="workspace card">
+  <!-- 右列：文件管理 + 搜索 + 文档整理 -->
+  <section class="card card-elevated detail-main">
     <div class="workspace-toolbar">
       <div class="toolbar-left">
-        <input id="file-filter" placeholder="过滤文件名或路径，回车确认" />
+        <button class="btn-secondary" id="btn-open-files">文件树</button>
+        <button class="btn-secondary" id="btn-search" data-pid="{{ project.id }}">搜索功能相关文件</button>
       </div>
       <div class="toolbar-right">
-        <a class="btn" href="/projects/{{ project.id }}/artifacts/spec.md" target="_blank">打开 Spec</a>
-        <a class="btn" href="/projects/{{ project.id }}/artifacts/llm_response.txt" target="_blank">查看响应</a>
+        <input id="file-filter" placeholder="过滤文件名或路径，回车确认" />
       </div>
     </div>
 
     <div class="workspace-body">
       <div class="panel file-panel" id="file-panel">
-        <h4>文件树</h4>
-        <div id="file-tree" class="file-tree">加载中...</div>
+        <h3>项目文件</h3>
+        <div id="file-tree" class="file-tree muted small">点击左上方“文件树”加载文件列表</div>
       </div>
 
       <div class="panel editor-panel" id="editor-panel">
-        <h4>搜索结果 / 编辑</h4>
+        <h3>搜索结果 · 文档整理</h3>
         <div class="two-pane">
           <div class="pane left-pane" id="search-results">
-            <div class="empty">点击“搜索项目”输入查询词开始检索（功能尚在后端实现）</div>
+            <div class="empty">点击“搜索功能相关文件”输入关键词，将在此列出相关实体类 / Service / Controller / 页面等（后端搜索稍后实现）。</div>
           </div>
           <div class="pane right-pane">
-            <textarea id="editor" placeholder="在此编辑整理好的文档（Spec 或说明），人工审核后点击提交给 LLM..."></textarea>
+            <textarea id="editor" placeholder="在此编写/整理任务说明、上下文摘要和注意事项。准备好后保存为 Spec，然后再提交给 LLM。"></textarea>
             <div class="editor-actions">
-              <button class="btn-primary" id="btn-save-doc">保存到 artifacts/spec.md</button>
-              <a class="btn" href="/projects/{{ project.id }}/artifacts/spec.md" target="_blank">打开当前 Spec</a>
+              <button class="btn-primary" id="btn-save-doc">保存为 Spec</button>
+              <a class="btn-ghost" href="/projects/{{ project.id }}/artifacts/spec.md" target="_blank">打开当前 Spec</a>
             </div>
           </div>
         </div>
       </div>
     </div>
-
   </section>
 </div>
 
 <!-- Search modal -->
 <div id="search-modal" class="modal" aria-hidden="true">
   <div class="modal-content">
-    <h3>搜索项目（实体 / 页面 / service / controller）</h3>
-    <input id="search-input" placeholder="输入关键词，例：登录 refresh token" />
+    <h3>搜索项目（实体 / 页面 / Service / Controller）</h3>
+    <input id="search-input" placeholder="输入功能关键词，例如：登录、订单列表、UserService" />
     <div class="modal-actions">
       <button class="btn-primary" id="search-confirm" data-pid="{{ project.id }}">搜索</button>
-      <button class="btn" id="search-cancel">取消</button>
+      <button class="btn-ghost" id="search-cancel">取消</button>
     </div>
   </div>
 </div>
 
 <script>
-  // expose pid for static app.js
   window.EVO_PROJECT_ID = "{{ project.id }}";
   window.EVO_PROJECT_ROOT = "{{ project.root }}";
 </script>
