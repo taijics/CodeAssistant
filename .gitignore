@@ -7,3 +7,4 @@ build/
 *.egg-info/
 .evo_agent/
 artifacts/
+node_modules/
