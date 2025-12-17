@@ -1,56 +1,26 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ProjectListHeader from '~/components/projects/ProjectListHeader.vue'
 import ProjectTable from '~/components/projects/ProjectTable.vue'
 import ProjectCreateDialog from '~/components/projects/ProjectCreateDialog.vue'
 import ProjectEditDialog from '~/components/projects/ProjectEditDialog.vue'
 
-interface Project {
-  id: number
-  name: string
-  // 原 rootPath 你可以保留为“项目根目录”
-  rootPath: string
-  // 新增三个子目录字段
-  frontendPath: string
-  serverPath: string
-  adminPath: string
-
-  description: string
-  createdAt: string
-  totalFiles: number
-  modifyCount: number
-  frontendFiles: number
-  serverFiles: number
-  adminFiles: number
-  feArch: string
-  serverArch: string
-  adminArch: string
-}
+// 引入我们刚建的 api
+import {
+  fetchProjects,
+  createProject,
+  updateProject,
+  deleteProject,
+  type Project,
+  type ProjectPayload,
+} from '~/api/project'
 
 const router = useRouter()
 
-const projects = ref<Project[]>([
-  {
-    id: 1,
-    name: '示例项目 A',
-    rootPath: '/Users/taiji/code/project-a',
-    frontendPath: '/Users/taiji/code/project-a/apps/web',
-    serverPath: '/Users/taiji/code/project-a/apps/server',
-    adminPath: '/Users/taiji/code/project-a/apps/admin',
-    description: '一个演示性质的电商项目',
-    createdAt: '2025-12-01 10:20:00',
-    totalFiles: 320,
-    modifyCount: 5,
-    frontendFiles: 120,
-    serverFiles: 150,
-    adminFiles: 50,
-    feArch: 'Vue3 + Element Plus + Vite',
-    serverArch: 'NestJS + PostgreSQL',
-    adminArch: 'Vue3 + Element Plus',
-  },
-])
+const projects = ref<Project[]>([])
 
+// 统计信息
 const totalProjects = computed(() => projects.value.length)
 const totalFiles = computed(() =>
   projects.value.reduce((sum, p) => sum + p.totalFiles, 0),
@@ -59,51 +29,66 @@ const totalModifyCount = computed(() =>
   projects.value.reduce((sum, p) => sum + p.modifyCount, 0),
 )
 
-// 新增
+// ========== 加载列表 ==========
+const listLoading = ref(false)
+
+async function loadProjects() {
+  try {
+    listLoading.value = true
+    projects.value = await fetchProjects()
+  } catch (e) {
+    console.error('加载项目列表失败', e)
+  } finally {
+    listLoading.value = false
+  }
+}
+
+onMounted(() => {
+  loadProjects()
+})
+
+// ========== 新增 ==========
 const createDialogVisible = ref(false)
 const createProjectLoading = ref(false)
 
-function handleCreate(payload: {
+async function handleCreate(payload: {
   name: string
   rootPath: string
-  frontendPath: string
-  serverPath: string
-  adminPath: string
-  description: string
-  feArch: string
-  serverArch: string
-  adminArch: string
+  frontendPath?: string
+  serverPath?: string
+  adminPath?: string
+  description?: string
+  feArch?: string
+  serverArch?: string
+  adminArch?: string
 }) {
-  createProjectLoading.value = true
-  const now = new Date()
-  const id = Date.now()
+  try {
+    createProjectLoading.value = true
 
-  projects.value.unshift({
-    id,
-    name: payload.name,
-    rootPath: payload.rootPath,
-    frontendPath: payload.frontendPath,
-    serverPath: payload.serverPath,
-    adminPath: payload.adminPath,
-    description: payload.description,
-    createdAt: now.toISOString().slice(0, 19).replace('T', ' '),
-    totalFiles: 0,
-    modifyCount: 0,
-    frontendFiles: 0,
-    serverFiles: 0,
-    adminFiles: 0,
-    feArch: payload.feArch,
-    serverArch: payload.serverArch,
-    adminArch: payload.adminArch,
-  })
+    const body: ProjectPayload = {
+      name: payload.name,
+      rootPath: payload.rootPath,
+      frontendPath: payload.frontendPath,
+      serverPath: payload.serverPath,
+      adminPath: payload.adminPath,
+      description: payload.description,
+      feArch: payload.feArch,
+      serverArch: payload.serverArch,
+      adminArch: payload.adminArch,
+    }
 
-  setTimeout(() => {
-    createProjectLoading.value = false
+    const created = await createProject(body)
+    // 加到列表最前面
+    projects.value.unshift(created)
     createDialogVisible.value = false
-  }, 200)
+  } catch (e) {
+    console.error('创建项目失败', e)
+  } finally {
+    createProjectLoading.value = false
+  }
 }
 
-// 编辑
+// ========== 编辑 ==========
 const editDialogVisible = ref(false)
 const editingProject = ref<Project | null>(null)
 const editProjectLoading = ref(false)
@@ -113,26 +98,60 @@ function handleOpenEdit(row: Project) {
   editDialogVisible.value = true
 }
 
-function handleUpdate(project: Project) {
-  editProjectLoading.value = true
-  const index = projects.value.findIndex(p => p.id === project.id)
-  if (index !== -1)
-    projects.value[index] = { ...projects.value[index], ...project }
+async function handleUpdate(project: Project) {
+  if (!project.id)
+    return
 
-  setTimeout(() => {
-    editProjectLoading.value = false
+  try {
+    editProjectLoading.value = true
+
+    const payload: ProjectPayload = {
+      name: project.name,
+      rootPath: project.rootPath,
+      frontendPath: project.frontendPath ?? undefined,
+      serverPath: project.serverPath ?? undefined,
+      adminPath: project.adminPath ?? undefined,
+      description: project.description ?? undefined,
+      feArch: project.feArch ?? undefined,
+      serverArch: project.serverArch ?? undefined,
+      adminArch: project.adminArch ?? undefined,
+    }
+
+    const updated = await updateProject(project.id, payload)
+
+    const index = projects.value.findIndex(p => p.id === updated.id)
+    if (index !== -1)
+      projects.value[index] = updated
+
     editDialogVisible.value = false
-  }, 200)
+  } catch (e) {
+    console.error('更新项目失败', e)
+  } finally {
+    editProjectLoading.value = false
+  }
 }
 
-// 跳详情
+// ========== 跳详情 ==========
 function handleDetail(row: Project) {
-  router.push('/projects/detail')
+  router.push(`/projects/detail/${row.id}`)
 }
 
-// 删除先占位
-function handleDelete(row: Project) {
-  console.log('delete project', row)
+// ========== 删除（现在可以真正调后端了） ==========
+const deleteLoading = ref(false)
+
+async function handleDelete(row: Project) {
+  if (!row.id)
+    return
+
+  try {
+    deleteLoading.value = true
+    await deleteProject(row.id)
+    projects.value = projects.value.filter(p => p.id !== row.id)
+  } catch (e) {
+    console.error('删除项目失败', e)
+  } finally {
+    deleteLoading.value = false
+  }
 }
 </script>
 

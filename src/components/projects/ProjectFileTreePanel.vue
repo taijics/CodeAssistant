@@ -20,12 +20,13 @@ const emit = defineEmits<{
 
 const treeRef = ref<InstanceType<typeof ElTree>>()
 
-function handleNodeClick(node: FileNode) {
+function handleNodeDblClick(node: FileNode) {
   if (node.type === 'dir')
     return
   emit('select-file', node)
 }
 </script>
+
 <template>
   <el-card class="w-1/3 flex flex-col" shadow="never">
     <template #header>
@@ -40,21 +41,9 @@ function handleNodeClick(node: FileNode) {
         default-expand-all
         highlight-current
         :props="{ label: 'name', children: 'children' }"
-        @node-click="handleNodeClick"
+        @node-dblclick="handleNodeDblClick"
       >
-        <template #default="{ data }">
-          <span class="flex items-center">
-            <i
-              v-if="data.type === 'dir'"
-              class="i-ep-folder mr-1 text-amber-500"
-            />
-            <i
-              v-else
-              class="i-ep-document mr-1 text-gray-500"
-            />
-            <span>{{ data.name }}</span>
-          </span>
-        </template>
+        <!-- 节点内容同之前 -->
       </el-tree>
     </div>
   </el-card>

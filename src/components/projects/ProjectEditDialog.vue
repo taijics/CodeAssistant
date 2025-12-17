@@ -5,10 +5,13 @@ interface Project {
   id: number
   name: string
   rootPath: string
-  description: string
-  feArch: string
-  serverArch: string
-  adminArch: string
+  frontendPath?: string
+  serverPath?: string
+  adminPath?: string
+  description?: string
+  feArch?: string
+  serverArch?: string
+  adminArch?: string
 }
 
 const props = defineProps<{
@@ -45,21 +48,45 @@ function handleSubmit() {
   <el-dialog
     :model-value="props.modelValue"
     title="编辑项目"
-    width="640px"
+    width="720px"
     destroy-on-close
     @close="handleClose"
   >
     <el-form
       :model="form"
-      label-width="100px"
+      label-width="110px"
       label-position="right"
     >
-      <el-form-item label="名称">
+      <el-form-item label="项目名称">
         <el-input v-model="form.name" placeholder="请输入项目名称" />
       </el-form-item>
 
-      <el-form-item label="本地地址">
-        <el-input v-model="form.rootPath" placeholder="请输入项目根路径（绝对路径）" />
+      <el-form-item label="项目根目录">
+        <el-input
+          v-model="form.rootPath"
+          placeholder="请输入项目根目录（绝对路径）"
+        />
+      </el-form-item>
+
+      <el-form-item label="用户前端目录">
+        <el-input
+          v-model="form.frontendPath"
+          placeholder="如：/Users/you/code/project-a/apps/web"
+        />
+      </el-form-item>
+
+      <el-form-item label="Server 端目录">
+        <el-input
+          v-model="form.serverPath"
+          placeholder="如：/Users/you/code/project-a/apps/server"
+        />
+      </el-form-item>
+
+      <el-form-item label="管理端前端目录">
+        <el-input
+          v-model="form.adminPath"
+          placeholder="如：/Users/you/code/project-a/apps/admin"
+        />
       </el-form-item>
 
       <el-form-item label="功能简介">

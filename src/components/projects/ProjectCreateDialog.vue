@@ -11,13 +11,13 @@ const emit = defineEmits<{
   (e: 'submit', payload: {
     name: string
     rootPath: string
-    frontendPath: string
-    serverPath: string
-    adminPath: string
-    description: string
-    feArch: string
-    serverArch: string
-    adminArch: string
+    frontendPath?: string
+    serverPath?: string
+    adminPath?: string
+    description?: string
+    feArch?: string
+    serverArch?: string
+    adminArch?: string
   }): void
 }>()
 
@@ -36,7 +36,6 @@ const form = ref({
 const rules = {
   name: [{ required: true, message: '请输入项目名称', trigger: 'blur' }],
   rootPath: [{ required: true, message: '请输入项目根路径（绝对路径）', trigger: 'blur' }],
-  // 三个子路径可以暂时不必强制必填，看你实际需要
 }
 
 function handleClose() {
@@ -71,8 +70,6 @@ function handleSubmit() {
           v-model="form.rootPath"
           placeholder="如：/Users/you/code/project-a"
         />
-        <!-- 将来可以加一个按钮，触发系统选择目录 -->
-        <!-- <el-button class="ml-2" @click="selectRootPath">选择目录</el-button> -->
       </el-form-item>
 
       <el-form-item label="用户前端目录">
